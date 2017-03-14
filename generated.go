@@ -1,4 +1,4 @@
-// info:{"Path":"github.com/davelondon/images","Hash":11461617162488775357}
+// info:{"Path":"github.com/dave/images","Hash":11461617162488775357}
 package images
 
 import (
@@ -25,6 +25,6 @@ func (o *Photo) GetPhoto(ctx context.Context) *Photo {
 	return o
 }
 func init() {
-	pkg := jsonctx.InitPackage("github.com/davelondon/images", 11461617162488775357)
+	pkg := jsonctx.InitPackage("github.com/dave/images", 11461617162488775357)
 	pkg.InitType("photo", reflect.TypeOf((*Photo)(nil)), reflect.TypeOf((*PhotoRule)(nil)), reflect.TypeOf((*PhotoInterface)(nil)).Elem())
 }

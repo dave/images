@@ -1,69 +1,92 @@
 package images
 
+// notest
+
 import (
-	"golang.org/x/net/context"
-	"kego.io/editor"
-	"kego.io/editor/client/mdl"
+	"context"
+
+	"frizz.io/editor/client/editable"
+	"frizz.io/editor/client/editors"
+	"frizz.io/editor/client/models"
+	"frizz.io/editor/client/stores"
+	"frizz.io/editor/client/views"
+	"frizz.io/flux"
+	"frizz.io/system"
+	"frizz.io/system/node"
+	"github.com/dave/vecty"
+	"github.com/dave/vecty/elem"
+	"github.com/dave/vecty/prop"
+	"github.com/dave/vecty/style"
 )
 
-func (i *Photo) GetEditor(n *editor.Node) editor.EditorInterface {
-	return &PhotoEditor{Photo: n.Value.(*Photo), Node: n, Editor: &editor.Editor{}}
+var _ editable.Editable = (*Photo)(nil)
+
+func (s *Photo) Format(rule *system.RuleWrapper) editable.Format {
+	return editable.Block
 }
 
-var _ editor.Editable = (*Photo)(nil)
-
-type PhotoEditor struct {
-	*Photo
-	*editor.Editor
-	*editor.Node
-	image *mdl.ImageStruct
-	url   *editor.StringEditor
+func (s *Photo) EditorView(ctx context.Context, node *node.Node, format editable.Format) vecty.Component {
+	return NewIconEditorView(ctx, node, format)
 }
 
-var _ editor.EditorInterface = (*PhotoEditor)(nil)
+type IconEditorView struct {
+	*views.View
 
-func (e *PhotoEditor) Layout() editor.Layout {
-	return editor.Page
+	model  *models.EditorModel
+	photo  *Photo
+	editor *editors.StringEditorView
 }
 
-func (e *PhotoEditor) Initialize(ctx context.Context, holder editor.BranchInterface, layout editor.Layout, fail chan error) error {
-
-	e.Editor.Initialize(ctx, holder, layout, fail)
-
-	e.url = editor.NewStringEditor(e.Node.Map["url"].(*editor.Node))
-	e.url.Initialize(ctx, holder, editor.Block, fail)
-	e.Editors = append(e.Editors, e.url)
-	e.AppendChild(e.url)
-
-	e.image = mdl.Image(e.Url.Value())
-	e.AppendChild(e.image)
-
-	go func() {
-		for se := range e.url.Listen().Ch {
-			e.update(se.(*editor.StringEditor).ValueString)
-			e.Send(e)
-		}
-	}()
-
-	e.update(e.Url.Value())
-
-	return nil
+func NewIconEditorView(ctx context.Context, node *node.Node, format editable.Format) *IconEditorView {
+	v := &IconEditorView{}
+	v.View = views.New(ctx, v)
+	v.model = v.App.Editors.Get(node)
+	v.photo = v.model.Node.Value.(*Photo)
+	v.Watch(v.model.Node,
+		stores.NodeValueChanged,
+		stores.NodeDescendantChanged,
+		stores.NodeFocus,
+	)
+	return v
 }
 
-func (e *PhotoEditor) update(url string) {
-	e.Url.Set(url)
-	e.image.Src = url
-	e.image.Visibility(url != "")
+func (v *IconEditorView) Receive(notif flux.NotifPayload) {
+	defer close(notif.Done)
+	v.photo = v.model.Node.Value.(*Photo)
+	vecty.Rerender(v)
+	if notif.Type == stores.NodeFocus {
+		v.Focus()
+	}
 }
 
-func (e *PhotoEditor) AddChildTreeEntry(child editor.EditorInterface) bool {
-	return false
+func (v *IconEditorView) Focus() {
+	v.editor.Focus()
 }
 
-func (e *PhotoEditor) Focus() {
-	e.url.Focus()
-}
-
-func (e *PhotoEditor) Value() interface{} {
-	return e.Photo
+func (v *IconEditorView) Render() *vecty.HTML {
+	v.editor = editors.NewStringEditorView(v.Ctx, v.model.Node.Map["url"], editable.Inline)
+	url := ""
+	if v.photo.Url != nil {
+		url = v.photo.Url.Value()
+	}
+	return elem.Div(
+		prop.Class("container-fluid"),
+		elem.Div(
+			prop.Class("row"),
+			elem.Div(
+				prop.Class("col-sm-10"),
+				vecty.Style("padding-left", "0"),
+				vecty.Style("padding-right", "0"),
+				v.editor,
+			),
+			elem.Div(
+				prop.Class("col-sm-2"),
+				elem.Image(
+					prop.Class("img-responsive"),
+					style.MaxHeight("200px"),
+					prop.Src(url),
+				),
+			),
+		),
+	)
 }
